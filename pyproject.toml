@@ -27,17 +27,23 @@ dependencies = [
     "torch>=2.0.0",
     "einops>=0.7.0",
     "lightning>=2.0.0",
-    "pytorch_lightning>=2.0.0",
     "torch_ema>=0.3",
     "matplotlib>=3.8.0",
     "scipy>=1.12.0",
+    "statsmodels>=0.14.0",
+    "seaborn>=0.13.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "ruff>=0.3.0",
     "mypy>=1.8.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
 ]
+
+[project.scripts]
+lob-prediction = "lob_prediction.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/luisreindlmeier/BT_Transformer_LOB"
@@ -48,42 +54,39 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["models*", "evaluation*"]
+where = ["src"]
 
-# =============================================================================
-# Ruff Configuration
-# =============================================================================
+[tool.setuptools.package-dir]
+"" = "src"
+
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py310"
 
 [tool.ruff.lint]
 select = [
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "F",      # Pyflakes
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade
+    "E",
+    "W",
+    "F",
+    "I",
+    "B",
+    "C4",
+    "UP",
 ]
 ignore = [
-    "E501",   # line too long (handled by formatter)
-    "B008",   # function call in default argument
-    "C901",   # too complex
-    "W191",   # indentation contains tabs
+    "E501",
+    "B008",
+    "C901",
+    "W191",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]  # unused imports in __init__.py are OK
-"models/*.py" = ["E741"]  # allow ambiguous variable names like 'l' in models
+"__init__.py" = ["F401"]
+"src/lob_prediction/models/*.py" = ["E741"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["config", "data", "trainer", "utils", "models", "evaluation"]
+known-first-party = ["lob_prediction"]
 
-# =============================================================================
-# MyPy Configuration
-# =============================================================================
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
@@ -94,4 +97,3 @@ exclude = [
     "^checkpoints/",
     "^results/",
 ]
-

@@ -12,29 +12,38 @@ Bachelor thesis: *Transformer-Based Prediction of Limit Order Book Dynamics for 
 ## Project Structure
 
 ```
-├── config.py              # Configuration constants
-├── data.py                # Data loading & preprocessing
-├── trainer.py             # Lightning training module
-├── train.py               # Minimal training script
-├── run.py                 # Full pipeline
-├── models/
-│   ├── tlob.py            # TLOB (Bilinear Normalization)
-│   ├── tlob_decay.py      # TLOB + Decay Attention
-│   ├── deeplob.py         # DeepLOB (CNN-GRU)
-│   ├── lit.py             # LiT Transformer
-│   ├── lit_decay.py       # LiT + Decay Attention
-│   └── decay_attention.py # Decay attention mechanism
-├── evaluation/
-│   ├── metrics.py         # Accuracy, F1, MCC, etc.
-│   ├── confidence.py      # Calibration & backtesting
-│   ├── decay.py           # Decay rate analysis
-│   ├── comparison.py      # Statistical tests
-│   └── latex.py           # LaTeX table export
+├── src/lob_prediction/
+│   ├── config.py              # Configuration constants
+│   ├── cli.py                 # Unified CLI entry point
+│   ├── data/
+│   │   ├── dataset.py         # LOBDataset, LOBDataModule
+│   │   ├── loading.py         # Data loading utilities
+│   │   └── preprocessing.py   # LOBSTER preprocessing
+│   ├── models/
+│   │   ├── components.py      # BiN, MLP, positional embeddings
+│   │   ├── attention.py       # Standard & Decay attention
+│   │   ├── tlob.py            # TLOB & TLOBDecay
+│   │   ├── deeplob.py         # DeepLOB (CNN-GRU)
+│   │   └── lit.py             # LiT & LiTDecay Transformer
+│   ├── training/
+│   │   ├── trainer.py         # Lightning training module
+│   │   └── loops.py           # Vanilla PyTorch training
+│   ├── evaluation/
+│   │   ├── metrics.py         # Accuracy, F1, MCC, etc.
+│   │   ├── calibration.py     # Calibration & backtesting
+│   │   ├── decay_analysis.py  # Decay rate analysis
+│   │   ├── statistical.py     # Statistical tests
+│   │   ├── plotting.py        # Visualization
+│   │   └── export.py          # LaTeX export
+│   └── utils/
+│       ├── seed.py            # Reproducibility
+│       ├── helpers.py         # Utility functions
+│       └── logging.py         # Logging setup
 ├── data/
-│   ├── raw/{TICKER}/      # Raw LOBSTER CSV files
+│   ├── raw/{TICKER}/          # Raw LOBSTER CSV files
 │   └── preprocessed/{TICKER}/
-├── checkpoints/           # Saved models
-└── results/               # Outputs
+├── checkpoints/               # Saved models
+└── results/                   # Outputs
 ```
 
 ## Setup
@@ -42,7 +51,7 @@ Bachelor thesis: *Transformer-Based Prediction of Limit Order Book Dynamics for 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ## Data
@@ -64,20 +73,28 @@ See `DATASET.md` for format details.
 
 ```bash
 # Preprocessing
-python train.py --ticker CSCO --preprocess
+python -m lob_prediction preprocess --ticker CSCO
 
-# Training (minimal)
-python train.py --ticker CSCO --epochs 10
+# Training (Lightning with EMA)
+python -m lob_prediction train --ticker CSCO --epochs 10
 
-# Training (full pipeline with analysis)
-python run.py --ticker CSCO --model TLOB --epochs 50
+# Full pipeline with analysis
+python -m lob_prediction run --ticker CSCO --model TLOB --epochs 50
 
 # With decay attention
-python run.py --ticker CSCO --model TLOB --decay --epochs 50
+python -m lob_prediction run --ticker CSCO --model TLOB --decay --epochs 50
 
 # Quick test
-python run.py --ticker CSCO --model TLOB --epochs 1 --data-fraction 0.01
+python -m lob_prediction run --ticker CSCO --model TLOB --epochs 1 --data-fraction 0.01
 ```
+
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `preprocess` | Preprocess raw LOBSTER data |
+| `train` | Train TLOB with Lightning (EMA, LR scheduling) |
+| `run` | Full pipeline with training, evaluation, and analysis |
 
 ### CLI Arguments
 
@@ -103,7 +120,7 @@ python run.py --ticker CSCO --model TLOB --epochs 1 --data-fraction 0.01
 | **LiTDecay** | Transformer | LiT + learnable decay attention |
 
 ```python
-from models import TLOB, DeepLOB, LiTTransformer, TLOBDecay
+from lob_prediction.models import TLOB, TLOBDecay, DeepLOB, LiTTransformer
 
 model = TLOB(hidden_dim=46, num_layers=4, seq_size=128)
 model = TLOBDecay(hidden_dim=46, num_layers=4, seq_size=128)

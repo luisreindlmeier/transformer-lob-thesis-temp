@@ -1,0 +1,16 @@
+\begin{table}[htbp]
+\caption{LOBSTER Event Types: Only types 1, 3, and 4 are retained for model training.}
+\label{tab:event_types}
+\begin{tabular}{clcrr}
+\toprule
+Event Type & Event Name & Retained & Count & Percentage \\
+\midrule
+1 & Limit Order Submission & Yes & 51,786,642 & 49.0\% \\
+2 & Partial Cancellation & No & 589,760 & 0.4\% \\
+3 & Full Cancellation & Yes & 48,566,333 & 45.5\% \\
+4 & Execution (Visible) & Yes & 3,385,449 & 3.9\% \\
+5 & Execution (Hidden) & No & 775,976 & 1.1\% \\
+6 & Cross Trade & No & 80 & 0.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}

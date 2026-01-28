@@ -8,6 +8,10 @@ __pycache__/
 *.so
 .Python
 *.egg-info/
+*.egg
+dist/
+build/
+.eggs/
 
 # Data (too large for Git)
 data/raw/*
