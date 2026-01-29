@@ -49,21 +49,6 @@ For each class c ∈ {Down, Stationary, Up}:
 | **Recall_c** | TP_c / (TP_c + FN_c) | "Of actual c, how many detected?" |
 | **F1_c** | 2 × (P_c × R_c) / (P_c + R_c) | Harmonic mean of P and R |
 
-**Implementation:**
-```python
-def compute_metrics(y_true, y_pred):
-    metrics = {
-        "accuracy": accuracy_score(y_true, y_pred),
-        "macro_f1": f1_score(y_true, y_pred, average="macro", labels=[0,1,2]),
-        "mcc": matthews_corrcoef(y_true, y_pred),
-    }
-    # Per-class metrics
-    for i, cls in enumerate(["down", "stat", "up"]):
-        metrics[f"precision_{cls}"] = precision_score(..., labels=[i])
-        metrics[f"recall_{cls}"] = recall_score(..., labels=[i])
-        metrics[f"f1_{cls}"] = f1_score(..., labels=[i])
-    return metrics
-```
 
 ### 2.4 Probabilistic Metrics
 
@@ -103,16 +88,7 @@ cm_norm[i,j] = cm[i,j] / Σ_i cm[i,j]
 ```
 Shows: "Of predicted class j, what fraction actually i?"
 
-### 3.3 Visualization
 
-```python
-def plot_confusion_matrix(cm, model_name, split, save_path):
-    cm_norm = cm / cm.sum(axis=1, keepdims=True)  # Row-normalize
-    plt.imshow(cm_norm, cmap="Blues")
-    for i in range(3):
-        for j in range(3):
-            plt.text(j, i, f"{cm_norm[i,j]:.1%}")
-```
 
 ## 4. Statistical Significance Testing
 

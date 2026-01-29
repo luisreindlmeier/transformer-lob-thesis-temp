@@ -115,7 +115,7 @@ Different heads converge to different decay rates, suggesting specialized roles.
 ### 4.1 Extracting Decay Rates
 
 ```python
-from lob_prediction.evaluation import analyze_model_decay
+from src_prediction.evaluation import analyze_model_decay
 
 # From trained model
 model = TLOBDecay(...)
@@ -292,8 +292,8 @@ Generated plots:
 ## 9. Code Example
 
 ```python
-from lob_prediction.models import TLOBDecay
-from lob_prediction.evaluation import analyze_model_decay
+from src_prediction.models import TLOBDecay
+from src_prediction.evaluation import analyze_model_decay
 from pathlib import Path
 
 # Train model

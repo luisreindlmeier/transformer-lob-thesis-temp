@@ -12,7 +12,7 @@ Bachelor thesis: *Transformer-Based Prediction of Limit Order Book Dynamics for 
 ## Project Structure
 
 ```
-├── src/lob_prediction/
+├── src_prediction/
 │   ├── config.py              # Configuration constants
 │   ├── cli.py                 # Unified CLI entry point
 │   ├── data/
@@ -73,19 +73,19 @@ See `DATASET.md` for format details.
 
 ```bash
 # Preprocessing
-python -m lob_prediction preprocess --ticker CSCO
+python -m src_prediction preprocess --ticker CSCO
 
 # Training (Lightning with EMA)
-python -m lob_prediction train --ticker CSCO --epochs 10
+python -m src_prediction train --ticker CSCO --epochs 10
 
 # Full pipeline with analysis
-python -m lob_prediction run --ticker CSCO --model TLOB --epochs 50
+python -m src_prediction run --ticker CSCO --model TLOB --epochs 50
 
 # With decay attention
-python -m lob_prediction run --ticker CSCO --model TLOB --decay --epochs 50
+python -m src_prediction run --ticker CSCO --model TLOB --decay --epochs 50
 
 # Quick test
-python -m lob_prediction run --ticker CSCO --model TLOB --epochs 1 --data-fraction 0.01
+python -m src_prediction run --ticker CSCO --model TLOB --epochs 1 --data-fraction 0.01
 ```
 
 ### CLI Commands
@@ -120,7 +120,7 @@ python -m lob_prediction run --ticker CSCO --model TLOB --epochs 1 --data-fracti
 | **LiTDecay** | Transformer | LiT + learnable decay attention |
 
 ```python
-from lob_prediction.models import TLOB, TLOBDecay, DeepLOB, LiTTransformer
+from src_prediction.models import TLOB, TLOBDecay, DeepLOB, LiTTransformer
 
 model = TLOB(hidden_dim=46, num_layers=4, seq_size=128)
 model = TLOBDecay(hidden_dim=46, num_layers=4, seq_size=128)
@@ -139,18 +139,13 @@ model = LiTTransformer(n_features=46, window=128)
 ## Citation
 
 ```bibtex
-@software{reindlmeier2026tlob,
+@software{reindlmeier2026thesis,
   author = {Reindlmeier, Luis},
   title = {Transformer-Based Prediction of Limit Order Book Dynamics},
   year = {2026},
   url = {https://github.com/luisreindlmeier/BT_Transformer_LOB}
 }
 ```
-
-## References
-
-- Zhang, Z., et al. (2019). *DeepLOB: Deep convolutional neural networks for limit order books.*
-- Vaswani, A., et al. (2017). *Attention is all you need.*
 
 ## License
 

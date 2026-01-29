@@ -279,7 +279,7 @@ self.ema = ExponentialMovingAverage(self.parameters(), decay=0.999)
 All configurable parameters are exposed via CLI:
 
 ```bash
-python -m lob_prediction run \
+python -m src_prediction run \
     --ticker CSCO \
     --model TLOB \
     --decay \

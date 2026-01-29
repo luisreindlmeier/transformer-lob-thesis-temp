@@ -351,7 +351,7 @@ class LiTDecayTransformer(BaseLiTTransformer):
 ## 8. Forward Pass Example
 
 ```python
-from lob_prediction.models import TLOB, TLOBDecay, LiTTransformer
+from src_prediction.models import TLOB, TLOBDecay, LiTTransformer
 
 # Input shape: (batch_size, seq_len, n_features)
 x = torch.randn(32, 128, 46)

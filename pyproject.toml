@@ -32,6 +32,7 @@ dependencies = [
     "scipy>=1.12.0",
     "statsmodels>=0.14.0",
     "seaborn>=0.13.0",
+    "tqdm>=4.66.0",
 ]
 
 [project.optional-dependencies]
@@ -43,7 +44,7 @@ dev = [
 ]
 
 [project.scripts]
-lob-prediction = "lob_prediction.cli:main"
+lob-prediction = "src_prediction.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/luisreindlmeier/BT_Transformer_LOB"
@@ -54,10 +55,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-dir]
-"" = "src"
+where = ["."]
 
 [tool.ruff]
 line-length = 120
@@ -82,10 +80,10 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
-"src/lob_prediction/models/*.py" = ["E741"]
+"src_prediction/models/*.py" = ["E741"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["lob_prediction"]
+known-first-party = ["src_prediction"]
 
 [tool.mypy]
 python_version = "3.10"

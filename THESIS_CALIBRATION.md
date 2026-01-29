@@ -411,8 +411,8 @@ At optimal threshold (τ ≈ 0.6-0.7):
 ## 11. Code Example
 
 ```python
-from lob_prediction.evaluation import analyze_confidence
-from lob_prediction.data import lobster_load, compute_returns
+from src_prediction.evaluation import analyze_confidence
+from src_prediction.data import lobster_load, compute_returns
 
 # Load data
 test_x, test_y, test_midprice = lobster_load("test.npy", return_midprice=True)

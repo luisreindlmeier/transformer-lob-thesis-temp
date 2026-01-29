@@ -7,7 +7,7 @@ The project uses a modern Python deep learning stack optimized for reproducibili
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Application Layer                     │
-│  lob_prediction (CLI, data, models, evaluation, utils)  │
+│  src_prediction (CLI, data, models, evaluation, utils)  │
 ├─────────────────────────────────────────────────────────┤
 │                   Framework Layer                        │
 │         PyTorch Lightning (training orchestration)       │
@@ -94,31 +94,26 @@ dependencies = [
 
 ```
 thesis/
-├── src/
-│   └── lob_prediction/           # Main package
-│       ├── __init__.py           # Package exports
-│       ├── __main__.py           # Entry point (python -m)
-│       ├── cli.py                # CLI commands
-│       ├── config.py             # Configuration constants
-│       ├── data/                 # Data handling
-│       ├── models/               # Neural networks
-│       ├── training/             # Training loops
-│       ├── evaluation/           # Metrics, analysis
-│       └── utils/                # Utilities
+├── src_prediction/                 # Main package
+│   ├── __init__.py                 # Package exports
+│   ├── __main__.py                 # Entry point (python -m)
+│   ├── cli.py                      # CLI commands
+│   ├── config.py                   # Configuration constants
+│   ├── data/                       # Data handling
+│   ├── models/                     # Neural networks
+│   ├── training/                   # Training loops
+│   ├── evaluation/                 # Metrics, analysis
+│   └── utils/                      # Utilities
+├── build/                          # egg-info, build artifacts (gitignored)
 ├── data/
-│   ├── raw/                      # LOBSTER CSVs
-│   └── preprocessed/             # NumPy arrays
-├── checkpoints/                  # Saved models
-├── results/                      # Experiment outputs
-├── pyproject.toml                # Package configuration
+│   ├── raw/                        # LOBSTER CSVs
+│   └── preprocessed/               # NumPy arrays
+├── checkpoints/                    # Saved models
+├── results/                        # Experiment outputs
+├── pyproject.toml                  # Package configuration
+├── setup.cfg                       # egg_info: egg_base = build
 └── README.md
 ```
-
-**Why src/ layout?**
-- Clear separation of installed code
-- Prevents accidental relative imports
-- Standard Python packaging practice
-- Enables `pip install -e .`
 
 ### 3.2 Module Responsibilities
 
@@ -166,7 +161,7 @@ ignore = ["E501"]  # Line length handled by formatter
 
 ```bash
 # Run tests (if implemented)
-pytest tests/ -v --cov=lob_prediction
+pytest tests/ -v --cov=src_prediction
 ```
 
 ## 5. Compute Requirements
@@ -220,7 +215,7 @@ source .venv/bin/activate  # Linux/Mac
 pip install -e .
 
 # Verify installation
-python -m lob_prediction --help
+python -m src_prediction --help
 ```
 
 ### 6.2 GPU Support
@@ -240,22 +235,22 @@ pip install torch --index-url https://download.pytorch.org/whl/cu118
 
 ```bash
 # Preprocess data
-python -m lob_prediction preprocess --ticker CSCO
+python -m src_prediction preprocess --ticker CSCO
 
 # Train model
-python -m lob_prediction train --ticker CSCO --epochs 10
+python -m src_prediction train --ticker CSCO --epochs 10
 
 # Full pipeline
-python -m lob_prediction run --ticker CSCO --model TLOB --decay
+python -m src_prediction run --ticker CSCO --model TLOB --decay
 ```
 
 ### 7.2 Programmatic Usage
 
 ```python
-from lob_prediction.models import TLOB, TLOBDecay
-from lob_prediction.data import lobster_load, LOBDataset
-from lob_prediction.training import train_model
-from lob_prediction.evaluation import compute_metrics
+from src_prediction.models import TLOB, TLOBDecay
+from src_prediction.data import lobster_load, LOBDataset
+from src_prediction.training import train_model
+from src_prediction.evaluation import compute_metrics
 
 # Load data
 train_x, train_y = lobster_load("data/preprocessed/CSCO/train.npy")
@@ -309,7 +304,7 @@ model.load_state_dict(torch.load("model.pt"))
 ### 9.1 Random Seeds
 
 ```python
-from lob_prediction.utils import set_seed
+from src_prediction.utils import set_seed
 set_seed(42)
 ```
 

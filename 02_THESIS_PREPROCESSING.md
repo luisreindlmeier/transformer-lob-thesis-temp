@@ -1,255 +1,13 @@
-# Data Preprocessing Pipeline
+# 4.3 Preprocessing Pipeline
 
-## 1. Pipeline Overview
+## Overview (before 4.3.1)
 
-The preprocessing pipeline transforms raw LOBSTER CSV files into model-ready NumPy arrays. The pipeline ensures:
+- **Input:** Raw LOBSTER CSVs (message + orderbook per day).
+- **Output:** NumPy arrays `train.npy`, `val.npy`, `test.npy` of shape \((N, 50)\).
+- **Pipeline order:** Merge → Event filtering → Feature engineering → **Temporal split** → Z-score normalization (train stats) → Label generation → Save per split.
+- **Constraints:** Chronological order preserved; normalization statistics from training data only (no leakage).
 
-1. **Temporal integrity**: Data remains chronologically ordered
-2. **Normalization**: Features are z-score normalized for stable training
-3. **Label generation**: Multi-horizon labels computed with smoothing
-4. **Split isolation**: Training statistics never leak to validation/test sets
-
-```
-Raw CSVs → Event Filtering → Feature Engineering → Normalization → Labeling → NumPy Arrays
-```
-
-## 2. Event Filtering
-
-### 2.1 Retained Events
-
-Only events that directly impact the visible order book are retained:
-
-| Event Type | Name | Included | Rationale |
-|------------|------|----------|-----------|
-| 1 | New Order | ✓ | New liquidity added to order book |
-| 2 | Partial Cancel | ✗ | Modifies existing order, no structural change |
-| 3 | Total Cancel | ✓ | Liquidity removed from order book |
-| 4 | Execution | ✓ | Trade occurred, liquidity consumed |
-| 5 | Hidden Execution | ✗ | Hidden liquidity not observable |
-| 6 | Cross Trade | ✗ | Auction mechanism, different dynamics |
-
-**Implementation:**
-```python
-indexes_to_drop = dataframes[0][dataframes[0]["event_type"].isin([2, 5, 6, 7])].index
-```
-
-**Why filter these events?**
-- Events 2, 5, 6  either don't change the visible order book or represent non-standard market mechanisms
-- Keeping only visible, structural changes ensures the model learns from actionable market information
-- Reduces noise and improves signal-to-noise ratio
-
-
-## 3. Feature Engineering
-
-### 3.1 Input Features (46 dimensions)
-
-The model receives 46 features per event, combining order-level and LOB-level information:
-
-#### Order Features (6 dimensions)
-
-| Index | Feature | Description | Transformation |
-|-------|---------|-------------|----------------|
-| 0 | `time` | Inter-event time delta | Z-score normalized |
-| 1 | `event_type` | Order event type
-| 2 | `size` | Order volume | Z-score normalized |
-| 3 | `price` | Order price | Z-score normalized |
-| 4 | `direction` | Buy (+1) or Sell (-1) | Sign-adjusted for executions |
-| 5 | `depth` | Price levels from BBO | Computed, Z-score normalized |
-
-
-#### LOB Features (40 dimensions)
-
-| Indices | Description |
-|---------|-------------|
-| 6-25 | Ask side: [price₁, size₁, price₂, size₂, ..., price₁₀, size₁₀] |
-| 26-45 | Bid side: [price₁, size₁, price₂, size₂, ..., price₁₀, size₁₀] |
-
-**Why 10 levels?**
-- Captures queue dynamics beyond best bid/offer
-- Shows liquidity depth and potential support/resistance
-- Standard in literature (DeepLOB, TLOB)
-- Diminishing information value beyond 10 levels
-
-### 3.2 Depth Calculation
-
-The `depth` feature measures how far an order's price is from the best bid/offer:
-
-```python
-if direction == 1:  # Buy order
-    depth = (best_bid - order_price) / tick_size
-else:  # Sell order
-    depth = (order_price - best_ask) / tick_size
-```
-
-**Interpretation:**
-- `depth = 0`: Order at best bid/offer (aggressive)
-- `depth > 0`: Order deeper in the book (passive)
-- Higher depth → less likely to be executed immediately
-
-**Why compute depth?**
-- Order aggressiveness is a key predictor of short-term price movements
-- Aggressive orders (depth=0) signal urgency and often precede price changes
-- Depth normalizes across different price levels
-
-### 3.3 Time Transformation
-
-Raw timestamps are converted to inter-event time deltas:
-
-
-**Why time deltas?**
-- Absolute timestamps have no predictive value
-- Time deltas capture market activity rhythm
-- Short deltas indicate high activity periods (potentially more volatility)
-- Long deltas indicate quiet periods
-
-### 3.4 Direction Sign Adjustment
-
-For execution events (type 4), the direction sign is inverted:
-
-```python
-direction = direction * (-1 if event_type == 4 else 1)
-```
-
-**Why?**
-- Execution events represent the *aggressor* side
-- A buy execution means someone *sold* to a buyer's limit order
-- Inverting preserves the information flow direction
-
-## 4. Normalization
-
-### 4.1 Z-Score Normalization
-
-All continuous features are z-score normalized:
-
-```
-x_normalized = (x - μ) / σ
-```
-
-**Where:**
-- μ = mean computed from training data only
-- σ = standard deviation computed from training data only
-
-**Implementation:**
-```python
-def z_score_orderbook(data, mean_size=None, std_size=None, mean_prices=None, std_prices=None):
-    if mean_size is None:
-        mean_size = data.iloc[:, 1::2].stack().mean()  # All size columns
-        std_size = data.iloc[:, 1::2].stack().std()
-    # Apply normalization...
-```
-
-### 4.2 Separate Statistics for Prices and Sizes
-
-Prices and sizes are normalized with separate statistics:
-
-| Feature Group | Statistics |
-|---------------|------------|
-| Prices (order + LOB) | Computed jointly across all price columns |
-| Sizes (order + LOB) | Computed jointly across all size columns |
-| Time deltas | Separate μ and σ |
-| Depth | Separate μ and σ |
-
-**Why separate statistics?**
-- Prices and sizes have fundamentally different distributions
-- Prices are typically normally distributed around a mean
-- Sizes follow a heavy-tailed distribution (many small, few large orders)
-- Joint normalization ensures consistent scaling within each feature type
-
-### 4.3 Train-Only Statistics
-
-**Critical:** Normalization statistics are computed **only from training data**:
-
-**Why?**
-- Prevents data leakage from future observations
-- Simulates real-world deployment where future statistics are unknown
-- Ensures honest evaluation on test set
-
-## 5. Label Generation
-
-### 5.1 Smoothed Mid-Price
-
-Labels are based on smoothed mid-prices, not raw mid-prices:
-
-```python
-def labeling(X, len_smooth, h):
-    # Sliding window average for smoothing
-    previous_mid = sliding_window_mean(midprice[t-len_smooth:t])
-    future_mid = sliding_window_mean(midprice[t+h-len_smooth:t+h])
-```
-
-**Parameters:**
-- `len_smooth = 10`: Window size for smoothing
-- `h`: Prediction horizon (10, 20, 50, or 100 events)
-
-**Why smoothing?**
-- Raw mid-prices are noisy (bid-ask bounce)
-- Smoothing captures the underlying trend, not microstructure noise
-- Window of 10 events is empirically effective (TLOB paper)
-
-
-## 6. Temporal Split
-
-### 6.1 Split Ratios
-
-| Split | Days | Ratio | Purpose |
-|-------|------|-------|---------|
-| Train | Days 1-17 | 85% | Model learning |
-| Validation | Day 18 | 5% | Early stopping, hyperparameter selection |
-| Test | Days 19-20 | 10% | Final evaluation |
-
-**Implementation:**
-```python
-SPLIT_RATES = [0.85, 0.05, 0.10]
-train_days = int(num_days * 0.85)
-val_days = int(num_days * 0.05)
-test_days = num_days - train_days - val_days
-```
-
-### 6.2 Why Temporal (Not Random) Split?
-
-**Random splits would cause data leakage:**
-- Adjacent events are highly correlated
-- Random sampling would mix training and test events from the same market conditions
-- Model would see "future" patterns during training
-
-**Temporal splits ensure:**
-- Training data is strictly before validation/test
-- Model must generalize to unseen market conditions
-- Evaluation reflects real deployment scenario
-
-## 7. Output Format
-
-### 7.1 NumPy Array Structure
-
-Output shape: `(N, 50)` where N = number of valid samples
-
-| Columns | Content |
-|---------|---------|
-| 0-5 | Order features: [time, event_type, size, price, direction, depth] |
-| 6-45 | LOB features: [ask_p1, ask_s1, bid_p1, bid_s1, ..., ask_p10, ask_s10, bid_p10, bid_s10] |
-| 46-49 | Labels: [label_h100, label_h50, label_h20, label_h10] |
-
-### 7.2 Sequence Construction
-
-At training time, sequences are constructed from the flat array:
-
-```python
-class LOBDataset:
-    def __getitem__(self, i):
-        x = self.data[i:i + seq_size, :46]  # (128, 46) input
-        y = self.labels[i]                   # Single label
-        return x, y
-```
-
-**Sequence length: 128 events**
-
-**Why 128?**
-- Captures ~1-2 seconds of market history
-- Power of 2 for efficient tensor operations
-- Balances context length vs. computational cost
-- Consistent with TLOB/DeepLOB literature
-
-## 8. Pipeline Diagram
+**Figure 4.X — Preprocessing pipeline.**
 
 ```
 ┌─────────────────┐     ┌─────────────────┐
@@ -305,33 +63,130 @@ class LOBDataset:
     └─────────┘ └─────────┘ └─────────┘
 ```
 
+---
 
+## 4.3.1 Event Filtering and Feature Engineering
 
+### Event filtering
 
+- **Retained event types:** 1 (New Order), 3 (Total Cancel), 4 (Execution).
+- **Dropped:** 2 (Partial Cancel), 5 (Hidden Execution), 6 (Cross Trade) — no visible LOB change or non-standard mechanism.
+- **Result:** One row per event that alters the visible book or represents a trade.
 
-### 5.2 Threshold Calculation
+### Order-level features (6 dims)
 
-The threshold α for class assignment is data-adaptive:
+| Index | Name     | Definition / formula |
+|-------|----------|-----------------------|
+| 0     | `time`   | Inter-event time delta: \(\Delta t_i = t_i - t_{i-1}\); \(t_0\): time since session start. |
+| 1     | `event_type` | Encoded: 1→0, 3→1, 4→2. |
+| 2     | `size`   | Order volume (raw). |
+| 3     | `price`  | Order price (raw, same scale as LOB). |
+| 4     | `direction` | \(+1\) buy, \(-1\) sell; for executions: sign inverted (aggressor side). |
+| 5     | `depth`  | Distance from best quote in ticks (see below). |
 
-```python
-pct_change = (future_mid - previous_mid) / previous_mid
-alpha = abs(pct_change).mean() / 2
-```
+- **Direction for executions:**
+  \[
+  \text{direction} \leftarrow \text{direction} \times (-1)^{\mathbb{1}[\text{event\_type}=4]}.
+  \]
+- **Depth (ticks):** With best bid \(B\), best ask \(A\), order price \(p\), tick size \(\tau\):
+  \[
+  \text{depth} = \max\left(0,\; \frac{B - p}{\tau}\right) \;\text{(buy)}, \qquad
+  \text{depth} = \max\left(0,\; \frac{p - A}{\tau}\right) \;\text{(sell)}.
+  \]
+  - depth = 0: at BBO (aggressive); depth > 0: passive.
 
-**Why adaptive threshold?**
-- Fixed thresholds don't account for varying volatility
-- Adaptive threshold ensures ~balanced classes
-- Factor of 2 empirically yields ~30/40/30 split
+### LOB features (40 dims)
 
-### 5.3 Class Assignment
+- **Indices 6–25:** Ask side — \([p_1^{\text{ask}}, v_1^{\text{ask}}, \ldots, p_{10}^{\text{ask}}, v_{10}^{\text{ask}}]\).
+- **Indices 26–45:** Bid side — \([p_1^{\text{bid}}, v_1^{\text{bid}}, \ldots, p_{10}^{\text{bid}}, v_{10}^{\text{bid}}]\).
+- **Levels:** \(L = 10\); same as DeepLOB/TLOB; price \(p_\ell\), volume \(v_\ell\) per level.
 
-```python
-label = 0 (Up)        if pct_change > +α
-label = 1 (Stationary) if -α ≤ pct_change ≤ +α
-label = 2 (Down)      if pct_change < -α
-```
+### Feature count
 
-**Why 3 classes?**
-- **Trading relevance**: Long (Up), Hold (Stationary), Short (Down)
-- **Balanced problem**: Avoids extreme class imbalance
-- **Standard in literature**: Comparable to prior work
+- **Total input dimension:** \(6 + 40 = 46\) per event.
+
+---
+
+## 4.3.2 Temporal Split
+
+- **Splits:** Train / Validation / Test by **calendar time** (no shuffling).
+- **Ratios:** \(r_{\text{train}} = 0.85\), \(r_{\text{val}} = 0.05\), \(r_{\text{test}} = 0.10\) of trading days.
+- **Day counts:** With \(D\) days,
+  \[
+  D_{\text{train}} = \lfloor D \cdot r_{\text{train}} \rfloor,\quad
+  D_{\text{val}} = \lfloor D \cdot r_{\text{val}} \rfloor,\quad
+  D_{\text{test}} = D - D_{\text{train}} - D_{\text{val}}.
+  \]
+- **Order:** Train = days \(1..D_{\text{train}}\), Val = next \(D_{\text{val}}\) days, Test = remaining days.
+- **Reason:** Avoids leakage from future; validation/test use strictly later time; evaluation reflects deployment.
+
+---
+
+## 4.3.3 Z-Score Normalization
+
+- **Formula (per scalar feature):**
+  \[
+  x' = \frac{x - \mu}{\sigma}, \qquad \mu = \frac{1}{n}\sum_{i=1}^n x_i,\quad \sigma = \sqrt{\frac{1}{n}\sum_{i=1}^n (x_i-\mu)^2}.
+  \]
+- **Statistics:** \(\mu,\sigma\) computed **only on the training split**; same \((\mu,\sigma)\) applied to validation and test.
+- **Feature groups and statistics:**
+
+| Group        | Columns / source      | Single \((\mu,\sigma)\)? |
+|-------------|------------------------|---------------------------|
+| Prices (LOB)| All LOB price columns  | Yes (one \(\mu_p,\sigma_p\)) |
+| Sizes (LOB) | All LOB size columns   | Yes (one \(\mu_s,\sigma_s\)) |
+| Order: time | `time`                 | Own \(\mu_t,\sigma_t\)     |
+| Order: size | `size`                 | Shared with LOB sizes      |
+| Order: price| `price`                | Shared with LOB prices     |
+| Order: depth| `depth`                | Own \(\mu_d,\sigma_d\)     |
+
+- **Not normalized:** `event_type`, `direction` (discrete).
+- **Leakage:** No use of val/test data when computing \(\mu,\sigma\).
+
+---
+
+## 4.3.4 Label Generation and Sequence Construction
+
+### Smoothed mid-price
+
+- **Mid-price:** \(m_t = (p_1^{\text{ask}}(t) + p_1^{\text{bid}}(t))/2\).
+- **Smoothing window:** length \(W = 10\) (events).
+- **Past/future smoothed mid:**
+  \[
+  \bar{m}_t^{\text{past}} = \frac{1}{W}\sum_{k=t-W}^{t-1} m_k,\qquad
+  \bar{m}_{t+h}^{\text{fut}} = \frac{1}{W}\sum_{k=t+h-W}^{t+h-1} m_k.
+  \]
+
+### Return and adaptive threshold
+
+- **Relative change (horizon \(h\)):**
+  \[
+  r_t^{(h)} = \frac{\bar{m}_{t+h}^{\text{fut}} - \bar{m}_t^{\text{past}}}{\bar{m}_t^{\text{past}}}.
+  \]
+- **Threshold:** \(\alpha^{(h)} = \frac{1}{2}\,\overline{|r^{(h)}|}\) (mean absolute return on training, divided by 2).
+
+### Class assignment (3 classes)
+
+- **Labels:** \(y_t^{(h)} \in \{0,1,2\}\):
+  \[
+  y_t^{(h)} = \begin{cases}
+  0\;\text{(Up)}       & \text{if } r_t^{(h)} > +\alpha^{(h)}, \\
+  1\;\text{(Stationary)} & \text{if } -\alpha^{(h)} \le r_t^{(h)} \le +\alpha^{(h)}, \\
+  2\;\text{(Down)}     & \text{if } r_t^{(h)} < -\alpha^{(h)}.
+  \end{cases}
+  \]
+- **Horizons:** \(h \in \{10, 20, 50, 100\}\) events; one label per horizon (columns 46–49).
+
+### Output array and sequence construction
+
+- **Stored array shape:** \((N, 50)\).
+  - Columns \(0\)–\(45\): input features (order 0–5, LOB 6–45).
+  - Columns \(46\)–\(49\): labels for \(h = 10, 20, 50, 100\).
+- **Sequence length:** \(T = 128\) events.
+- **Training sample at index \(i\):** Input = events \(i, \ldots, i+T-1\); label = label of event \(i+T-1\) (end of window):
+  \[
+  \mathbf{x}_i = \mathbf{X}[i:i+T,\, :46] \in \mathbb{R}^{128 \times 46},\qquad
+  y_i = \mathbf{X}[i+T-1,\, 46:50].
+  \]
+- **Number of sequences:** \(N_{\text{seq}} = N - T + 1\) (sliding window, stride 1).
+- **Rationale for \(T=128\):** ~1–2 s of history; power of 2; aligned with TLOB/DeepLOB.
